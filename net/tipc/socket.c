@@ -487,7 +487,7 @@ static void __tipc_shutdown(struct socket *sock, int error)
 	struct sock *sk = sock->sk;
 	struct tipc_sock *tsk = tipc_sk(sk);
 	struct net *net = sock_net(sk);
-	long timeout = CONN_TIMEOUT_DEFAULT;
+	long timeout = msecs_to_jiffies(CONN_TIMEOUT_DEFAULT);
 	u32 dnode = tsk_peer_node(tsk);
 	struct sk_buff *skb;
 
@@ -2126,18 +2126,18 @@ static int tipc_shutdown(struct socket *sock, int how)
 	lock_sock(sk);
 
 	__tipc_shutdown(sock, TIPC_CONN_SHUTDOWN);
-	sk->sk_shutdown = SEND_SHUTDOWN;
+	sk->sk_shutdown = SHUTDOWN_MASK;
 
 	if (sk->sk_state == TIPC_DISCONNECTING) {
 		/* Discard any unreceived messages */
 		__skb_queue_purge(&sk->sk_receive_queue);
 
-		/* Wake up anyone sleeping in poll */
-		sk->sk_state_change(sk);
 		res = 0;
 	} else {
 		res = -ENOTCONN;
 	}
+	/* Wake up anyone sleeping in poll. */
+	sk->sk_state_change(sk);
 
 	release_sock(sk);
 	return res;

@@ -104,7 +104,6 @@ struct stmmac_priv {
 	struct device *device;
 	struct mac_device_info *hw;
 	struct phy_device *phydev;
-	/* Mutex lock */
 	struct mutex lock;
 
 	/* RX Queue */
@@ -149,6 +148,7 @@ struct stmmac_priv {
 	void __iomem *ptpaddr;
 	u32 mss;
 	bool boot_kpi;
+
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dbgfs_dir;
 	struct dentry *dbgfs_rings_status;

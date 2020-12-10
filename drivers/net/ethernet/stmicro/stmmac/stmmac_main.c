@@ -51,8 +51,7 @@
 #include <linux/of_mdio.h>
 #include "dwmac1000.h"
 
-
-#define	STMMAC_ALIGN(x)		__ALIGN_KERNEL(x, SMP_CACHE_BYTES)
+#define	STMMAC_ALIGN(x)		ALIGN(ALIGN(x, SMP_CACHE_BYTES), 16)
 #define	TSO_MAX_BUFF_SIZE	(SZ_16K - 1)
 
 /* Module parameters */
@@ -859,22 +858,6 @@ static void stmmac_adjust_link(struct net_device *dev)
 
 	mutex_unlock(&priv->lock);
 
-	if (new_state) {
-		if (phydev->link == 1 && priv->tx_queue[IPA_DMA_TX_CH].skip_sw)
-			ethqos_ipa_offload_event_handler(priv,
-							 EV_PHY_LINK_UP);
-		else if (phydev->link == 0 &&
-			 priv->tx_queue[IPA_DMA_TX_CH].skip_sw)
-			ethqos_ipa_offload_event_handler(priv,
-							 EV_PHY_LINK_DOWN);
-	}
-#ifdef CONFIG_MSM_BOOT_TIME_MARKER
-if (phydev->link == 1 && !priv->boot_kpi) {
-	place_marker("M - Ethernet is Ready.Link is UP");
-	priv->boot_kpi = true;
-}
-#endif
-
 	if (phydev->is_pseudo_fixed_link)
 		/* Stop PHY layer to call the hook to adjust the link in case
 		 * of a switch is attached to the stmmac driver.
@@ -1126,7 +1109,9 @@ static int stmmac_set_bfsize(int mtu, int bufsize)
 {
 	int ret = bufsize;
 
-	if (mtu >= BUF_SIZE_4KiB)
+	if (mtu >= BUF_SIZE_8KiB)
+		ret = BUF_SIZE_16KiB;
+	else if (mtu >= BUF_SIZE_4KiB)
 		ret = BUF_SIZE_8KiB;
 	else if (mtu >= BUF_SIZE_2KiB)
 		ret = BUF_SIZE_4KiB;
@@ -3799,11 +3784,23 @@ static void stmmac_set_rx_mode(struct net_device *dev)
 static int stmmac_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
+	int txfifosz = priv->plat->tx_fifo_size;
+
+	if (txfifosz == 0)
+		txfifosz = priv->dma_cap.tx_fifo_size;
+
+	txfifosz /= priv->plat->tx_queues_to_use;
 
 	if (netif_running(dev)) {
 		netdev_err(priv->dev, "must be stopped to change its MTU\n");
 		return -EBUSY;
 	}
+
+	new_mtu = STMMAC_ALIGN(new_mtu);
+
+	/* If condition true, FIFO is too small or MTU too large */
+	if ((txfifosz < new_mtu) || (new_mtu > BUF_SIZE_16KiB))
+		return -EINVAL;
 
 	dev->mtu = new_mtu;
 

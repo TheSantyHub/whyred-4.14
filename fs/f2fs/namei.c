@@ -320,8 +320,6 @@ static int f2fs_link(struct dentry *old_dentry, struct inode *dir,
 
 	if (unlikely(f2fs_cp_error(sbi)))
 		return -EIO;
-	if (!f2fs_is_checkpoint_ready(sbi))
-		return -ENOSPC;
 
 	err = fscrypt_prepare_link(old_dentry, dir, dentry);
 	if (err)
@@ -859,8 +857,6 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 	if (unlikely(f2fs_cp_error(sbi)))
 		return -EIO;
-	if (!f2fs_is_checkpoint_ready(sbi))
-		return -ENOSPC;
 
 	if (is_inode_flag_set(new_dir, FI_PROJ_INHERIT) &&
 			(!projid_eq(F2FS_I(new_dir)->i_projid,
@@ -1050,12 +1046,10 @@ static int f2fs_cross_rename(struct inode *old_dir, struct dentry *old_dentry,
 	struct f2fs_dir_entry *old_dir_entry = NULL, *new_dir_entry = NULL;
 	struct f2fs_dir_entry *old_entry, *new_entry;
 	int old_nlink = 0, new_nlink = 0;
-	int err;
+	int err = -ENOENT;
 
 	if (unlikely(f2fs_cp_error(sbi)))
 		return -EIO;
-	if (!f2fs_is_checkpoint_ready(sbi))
-		return -ENOSPC;
 
 	if ((is_inode_flag_set(new_dir, FI_PROJ_INHERIT) &&
 			!projid_eq(F2FS_I(new_dir)->i_projid,
